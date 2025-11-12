@@ -1,0 +1,13 @@
+{
+  "avatar_path": {
+    "description": "机器人头像路径或URL（支持相对插件目录）；留空则尝试平台头像或示例图片",
+    "type": "string",
+    "default": "templates/logo/avatar.webp"
+  },
+  "avatar_text": {
+    "description": "头像旁显示的文字（Bot 名称）",
+    "type": "string",
+    "default": "AstrBot"
+  }
+}
+

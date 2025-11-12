@@ -26,9 +26,10 @@ CACHE_DIR = Path(__file__).parent / ".cache"
     "1.0.0",
 )
 class PicStatusPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config=None):
         super().__init__(context)
         ensure_dir(CACHE_DIR)
+        self.config = config
 
     async def initialize(self):
         logger.info("PicStatus plugin initialized")
@@ -42,15 +43,25 @@ class PicStatusPlugin(Star):
             collected.setdefault("ps_version", "v1.0.0")
             # Provide header bots info for template compatibility
             try:
-                bot_nick = os.getenv("PICSTATUS_BOT_NICK")
+                # 1) Bot 昵称优先顺序：插件配置 avatar_text > 环境变量 > AstrBot
+                bot_nick = None
+                if isinstance(getattr(self, "config", None), dict):
+                    bot_nick = self.config.get("avatar_text") or None
                 if not bot_nick:
-                    # Fallback to platform-specific defaults
-                    bot_nick = "AstrBot"
+                    bot_nick = (
+                        os.getenv("PICSTATUS_BOT_NICK")
+                        or os.getenv("NICKNAME")
+                        or "AstrBot"
+                    )
+
+                self_id = event.get_self_id()
+                adapter = (event.get_platform_name() or "AstrBot")
+
                 bots = [
                     {
-                        "self_id": event.get_self_id(),
+                        "self_id": self_id,
                         "nick": bot_nick,
-                        "adapter": (event.get_platform_name() or "AstrBot"),
+                        "adapter": adapter,
                         "bot_connected": collected.get("nonebot_run_time", ""),
                         "msg_rec": 0,
                         "msg_sent": 0,
@@ -96,8 +107,46 @@ class PicStatusPlugin(Star):
             if use_astr_t2i and out_path is None:
                 try:
                     from .t2i_renderer import build_default_html
+                    import httpx
 
-                    html = build_default_html(collected, resolved.data)
+                    # 尝试获取 Bot 头像：PICSTATUS_BOT_AVATAR_URL > QQ qlogo（若平台为 AIoCQHTTP/QQ）
+                    avatar_bytes = None
+                    # 配置优先：avatar_path 可为 URL 或相对/绝对路径
+                    avatar_url = None
+                    avatar_path_cfg = None
+                    if isinstance(getattr(self, "config", None), dict):
+                        avatar_path_cfg = (self.config.get("avatar_path") or "").strip()
+                    if avatar_path_cfg:
+                        if avatar_path_cfg.startswith("http://") or avatar_path_cfg.startswith("https://"):
+                            avatar_url = avatar_path_cfg
+                        else:
+                            p = Path(avatar_path_cfg)
+                            if not p.is_absolute():
+                                p = Path(__file__).parent / avatar_path_cfg
+                            if p.exists():
+                                try:
+                                    avatar_bytes = p.read_bytes()
+                                except Exception:
+                                    avatar_bytes = None
+                    # 环境变量次之
+                    if (avatar_bytes is None) and (avatar_url is None):
+                        avatar_url = os.getenv("PICSTATUS_BOT_AVATAR_URL")
+                    if not avatar_url:
+                        try:
+                            if "qq" in adapter.lower() or "aiocqhttp" in adapter.lower():
+                                avatar_url = f"https://q1.qlogo.cn/g?b=qq&nk={self_id}&s=640"
+                        except Exception:
+                            pass
+                    if avatar_url:
+                        try:
+                            with httpx.Client(follow_redirects=True, timeout=5) as cli:
+                                r = cli.get(avatar_url)
+                                r.raise_for_status()
+                                avatar_bytes = r.content
+                        except Exception:
+                            avatar_bytes = None
+
+                    html = build_default_html(collected, resolved.data, avatar_bytes=avatar_bytes)
                     # Use AstrBot built-in html_render
                     options = {"type": "jpeg", "quality": 90, "full_page": True}
                     out_url = await self.html_render(html, {}, return_url=True, options=options)

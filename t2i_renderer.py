@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import jinja2
 
@@ -16,7 +16,7 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_default_html(collected: dict[str, Any], bg_bytes: bytes) -> str:
+def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes: Optional[bytes] = None) -> str:
     """Compose a single-file HTML with inline CSS and macros, no external fetch.
 
     - Inline macros.html.jinja at top of index template
@@ -35,7 +35,13 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes) -> str:
         lines = lines[1:]
     index_no_import = "\n".join(lines)
 
-    # 2) remove external js includes
+    # 2) tweak viewport to exact content width to avoid right-side whitespace on full_page screenshots
+    index = index.replace(
+        'content="width=device-width, initial-scale=1.0"',
+        'content="width=650, initial-scale=1.0"',
+    )
+
+    # remove external js includes
     index_no_js = index_no_import.replace(
         '<script src="/js/init-global.js"></script>', "",
     ).replace(
@@ -60,7 +66,10 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes) -> str:
 
     # 5) inline default avatar for header (replace lazy data-src with inline src)
     try:
-        avatar_b64 = base64.b64encode((ROOT / "res" / "assets" / "default_avatar.webp").read_bytes()).decode("ascii")
+        if avatar_bytes is None:
+            avatar_bytes = (ROOT / "res" / "assets" / "default_avatar.webp").read_bytes()
+        avatar_b64 = base64.b64encode(avatar_bytes).decode("ascii")
+        # 将 lazy 的 data-src 改为 src，保证 t2i 无需 JS 也能显示
         index_bg = index_bg.replace(
             'data-src="/api/bot_avatar/{{ info.self_id }}"',
             f'src="data:image/webp;base64,{avatar_b64}"',
