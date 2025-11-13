@@ -51,8 +51,8 @@
 {% set swap_total = d.swap_stat.total | auto_convert_unit %}
 <div class="card cpu-mem-usage donut-chart-line">
   {{ donut_chart(d.cpu_percent, "CPU", "{}核 {}线程 {}\n{}".format(count, logical, freq, d.cpu_brand)) }}
-  {{ donut_chart(d.memory_stat.percent, "RAM", "{} / {}").format(ram_used, ram_total) }}
-  {{ donut_chart(d.swap_stat.percent, "SWAP", "{} / {}").format(swap_used, swap_total) }}
+  {{ donut_chart(d.memory_stat.percent, "RAM", "{} / {}".format(ram_used, ram_total)) }}
+  {{ donut_chart(d.swap_stat.percent, "SWAP", "{} / {}".format(swap_used, swap_total)) }}
 </div>
 {% endmacro %}
 

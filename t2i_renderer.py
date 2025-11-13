@@ -36,7 +36,8 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes:
     index_no_import = "\n".join(lines)
 
     # 2) tweak viewport to exact content width to avoid right-side whitespace on full_page screenshots
-    index = index.replace(
+    #    必须对去掉 import 之后的版本生效，后续处理都基于 index_no_import。
+    index_no_import = index_no_import.replace(
         'content="width=device-width, initial-scale=1.0"',
         'content="width=650, initial-scale=1.0"',
     )
