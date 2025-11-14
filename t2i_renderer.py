@@ -109,20 +109,24 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes:
     from .utils import CpuFreq
 
     def format_cpu_freq(freq: CpuFreq) -> str:
-        def cu(x: float | None) -> str:
+        """将 psutil 返回的 MHz 频率友好地格式化为 MHz/GHz 文本。
+
+        psutil.cpu_freq() 通常返回 MHz，因此这里按 MHz 处理：
+        - < 1000MHz：显示为 `XXXMHz`
+        - >= 1000MHz：显示为 `X.XXGHz`
+        """
+
+        def fmt(x: float | None) -> str:
             if not x:
                 return "未知"
-            v = x
-            units = ["Hz", "KHz", "MHz", "GHz"]
-            idx = 0
-            while v >= 1000 and idx < len(units) - 1:
-                v /= 1000
-                idx += 1
-            return f"{v:.0f}{units[idx]}"
+            # x 为 MHz
+            if x >= 1000:
+                return f"{x / 1000:.2f}GHz"
+            return f"{x:.0f}MHz"
 
-        cur = cu(freq.current)
-        if freq.max:
-            return f"{cur} / {cu(freq.max)}"
+        cur = fmt(freq.current)
+        if freq.max not in (None, 0):
+            return f"{cur} / {fmt(freq.max)}"
         return cur
 
     def br_filter(value: Any) -> Markup:
