@@ -1,16 +1,17 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Final
 
+import astrbot.api.message_components as Comp
+import httpx
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
+from .bg_provider import resolve_background
 from .collectors import collect_all
 from .utils import ensure_dir
-from .bg_provider import resolve_background
-import os
-import astrbot.api.message_components as Comp
 
 
 PLUGIN_NAME: Final[str] = "astrbot_plugin_picstatus"
@@ -43,19 +44,18 @@ class PicStatusPlugin(Star):
             collected.setdefault("ps_version", "v1.0.0")
             # Provide header bots info for template compatibility
             try:
-                # 1) Bot 昵称优先顺序：插件配置 avatar_text > 环境变量 > AstrBot
-                bot_nick = None
-                if isinstance(getattr(self, "config", None), dict):
-                    bot_nick = self.config.get("avatar_text") or None
-                if not bot_nick:
-                    bot_nick = (
-                        os.getenv("PICSTATUS_BOT_NICK")
-                        or os.getenv("NICKNAME")
-                        or "AstrBot"
-                    )
-
                 self_id = event.get_self_id()
                 adapter = (event.get_platform_name() or "AstrBot")
+
+                # 1) 头像右侧文字：留空使用默认 "AstrBot"，填写则使用用户配置
+                cfg = getattr(self, "config", None)
+                bot_nick: str = "AstrBot"
+                if hasattr(cfg, "get"):
+                    raw = cfg.get("avatar_text")
+                    if isinstance(raw, str):
+                        raw = raw.strip()
+                        if raw:
+                            bot_nick = raw
 
                 bots = [
                     {
@@ -78,10 +78,10 @@ class PicStatusPlugin(Star):
                     if isinstance(seg, Comp.Image):
                         f = getattr(seg, "file", None) or ""
                         if isinstance(f, str) and f.startswith(("http://", "https://")):
-                            import httpx
-
-                            with httpx.Client(follow_redirects=True, timeout=5) as cli:
-                                r = cli.get(f)
+                            async with httpx.AsyncClient(
+                                follow_redirects=True, timeout=5
+                            ) as cli:
+                                r = await cli.get(f)
                                 r.raise_for_status()
                                 bg_bytes = r.content
                                 break
@@ -98,28 +98,10 @@ class PicStatusPlugin(Star):
             # Only use AstrBot t2i path
             try:
                 from .t2i_renderer import build_default_html
-                import httpx
 
-                # 尝试获取 Bot 头像：配置 avatar_path > 环境变量 > QQ qlogo > 默认
+                # 尝试获取 Bot 头像：只使用 Bot 自身头像（QQ qlogo 等）
                 avatar_bytes = None
                 avatar_url = None
-                avatar_path_cfg = None
-                if isinstance(getattr(self, "config", None), dict):
-                    avatar_path_cfg = (self.config.get("avatar_path") or "").strip()
-                if avatar_path_cfg:
-                    if avatar_path_cfg.startswith("http://") or avatar_path_cfg.startswith("https://"):
-                        avatar_url = avatar_path_cfg
-                    else:
-                        p = Path(avatar_path_cfg)
-                        if not p.is_absolute():
-                            p = Path(__file__).parent / avatar_path_cfg
-                        if p.exists():
-                            try:
-                                avatar_bytes = p.read_bytes()
-                            except Exception:
-                                avatar_bytes = None
-                if (avatar_bytes is None) and (avatar_url is None):
-                    avatar_url = os.getenv("PICSTATUS_BOT_AVATAR_URL")
                 if not avatar_url:
                     try:
                         if "qq" in adapter.lower() or "aiocqhttp" in adapter.lower():
@@ -128,14 +110,18 @@ class PicStatusPlugin(Star):
                         pass
                 if avatar_url:
                     try:
-                        with httpx.Client(follow_redirects=True, timeout=5) as cli:
-                            r = cli.get(avatar_url)
+                        async with httpx.AsyncClient(
+                            follow_redirects=True, timeout=5
+                        ) as cli:
+                            r = await cli.get(avatar_url)
                             r.raise_for_status()
                             avatar_bytes = r.content
                     except Exception:
                         avatar_bytes = None
 
-                html = build_default_html(collected, resolved.data, avatar_bytes=avatar_bytes)
+                html = build_default_html(
+                    collected, resolved.data, resolved.mime, avatar_bytes=avatar_bytes
+                )
                 # 未增强 t2i：整页截图；页面背景由模板负责铺满
                 options = {"type": "jpeg", "quality": 90, "full_page": True}
                 out_url = await self.html_render(html, {}, return_url=True, options=options)

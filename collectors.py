@@ -10,7 +10,7 @@ import httpx
 import psutil
 from cpuinfo import get_cpu_info
 
-from .utils import CpuFreq
+from .utils import CpuFreq, readable_python_version, system_name
 
 
 def _dt_now() -> datetime:
@@ -184,12 +184,12 @@ class ConnTest:
 
 async def connection_test() -> list[ConnTest]:
     sites = [
-        ("百度", "https://www.baidu.com/", False),
-        ("Google", "https://www.google.com/", True),
+        ("百度", "https://www.baidu.com/"),
+        ("Google", "https://www.google.com/"),
     ]
     out: list[ConnTest] = []
     async with httpx.AsyncClient(follow_redirects=True, timeout=5) as cli:
-        for (name, url, _use_proxy) in sites:
+        for (name, url) in sites:
             start = time.perf_counter()
             try:
                 resp = await cli.get(url)
@@ -254,21 +254,9 @@ async def collect_all() -> dict[str, Any]:
         "process_status": process_status(),
         # footer 信息：时间、Python 版本、系统名称、插件版本等
         "time": _dt_now().strftime("%Y-%m-%d %H:%M:%S"),
-        "python_version": sys_version(),
-        "system_name": system_name_readable(),
+        "python_version": readable_python_version(),
+        "system_name": system_name(),
         # header：AstrBot / 机器人运行时长
         "bot_run_time": _format_td(_dt_now() - ASTRBOT_START_TIME),
         "system_run_time": _format_td(_dt_now() - BOOT_TIME),
     }
-
-
-def sys_version() -> str:
-    import sys
-
-    return f"Python {sys.version.split(' ')[0]}"
-
-
-def system_name_readable() -> str:
-    import platform
-
-    return f"{platform.system()} {platform.release()} ({platform.machine()})"

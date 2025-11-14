@@ -17,7 +17,12 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes: Optional[bytes] = None) -> str:
+def build_default_html(
+    collected: dict[str, Any],
+    bg_bytes: bytes,
+    bg_mime: str = "image/jpeg",
+    avatar_bytes: Optional[bytes] = None,
+) -> str:
     """Compose a single-file HTML with inline CSS and macros, no external fetch.
 
     - Inline macros.html.jinja at top of index template
@@ -63,19 +68,31 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes:
     b64 = base64.b64encode(bg_bytes).decode("ascii")
     index_bg = index_inlined_css.replace(
         '<div class="main-background" data-background-image="/api/background">',
-        f'<div class="main-background" style="background-image:url(\'data:image/jpeg;base64,{b64}\')">',
+        f'<div class="main-background" style="background-image:url(\'data:{bg_mime};base64,{b64}\')">',
     )
     # 不向 body/html 注入背景，避免整页截图时出现与主容器重复的背景
 
-    # 5) inline default avatar for header (replace lazy data-src with inline src)
+    # 5) inline avatar for header (replace lazy data-src with inline src)
     try:
         if avatar_bytes is None:
             avatar_bytes = (ROOT / "res" / "assets" / "default_avatar.webp").read_bytes()
         avatar_b64 = base64.b64encode(avatar_bytes).decode("ascii")
-        # 将 lazy 的 data-src 改为 src，保证 t2i 无需 JS 也能显示
-        index_bg = index_bg.replace(
+        # 简单根据魔数检测图片类型，尽量匹配本地/远程头像真实格式
+        def _detect_image_mime(data: bytes) -> str:
+            if data.startswith(b"\x89PNG\r\n\x1a\n"):
+                return "image/png"
+            if data.startswith(b"\xff\xd8\xff"):
+                return "image/jpeg"
+            if data.startswith(b"RIFF") and b"WEBP" in data[:16]:
+                return "image/webp"
+            return "image/png"
+
+        avatar_mime = _detect_image_mime(avatar_bytes)
+        # 将 lazy 的 data-src 改为 src，保证 t2i 无需 JS 也能显示。
+        # header 模板定义在 macros.html.jinja 中，所以需要在 macros 字符串上替换。
+        macros = macros.replace(
             'data-src="/api/bot_avatar/{{ info.self_id }}"',
-            f'src="data:image/webp;base64,{avatar_b64}"',
+            f'src=\"data:{avatar_mime};base64,{avatar_b64}\"',
         )
     except Exception:
         # ignore if asset missing
