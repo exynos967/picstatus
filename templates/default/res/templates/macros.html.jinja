@@ -35,7 +35,7 @@
   </div>
   {% endfor %}
   <div class="extra label-container">
-    <span class="label gray">NoneBot运行 {{ d.nonebot_run_time }}</span>
+    <span class="label gray">AstrBot 运行 {{ d.bot_run_time }}</span>
     <span class="label gray">系统运行 {{ d.system_run_time }}</span>
   </div>
 </div>
@@ -136,7 +136,7 @@
 
 {% macro footer(d) %}
 <div class="footer">
-  NoneBot {{ d.nonebot_version }} × PicStatus {{ d.ps_version }} | {{ d.time }}<br />
+  AstrBot × PicStatus {{ d.ps_version }} | {{ d.time }}<br />
   {{ d.python_version }} | {{ d.system_name }}
 </div>
 {% endmacro %}

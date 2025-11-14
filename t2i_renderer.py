@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import jinja2
+from markupsafe import Markup
 
 
 ROOT = Path(__file__).parent
@@ -124,11 +125,17 @@ def build_default_html(collected: dict[str, Any], bg_bytes: bytes, avatar_bytes:
             return f"{cur} / {cu(freq.max)}"
         return cur
 
+    def br_filter(value: Any) -> Markup:
+        """将字符串中的换行符替换为 <br />，并标记为安全 HTML。"""
+        if value is None:
+            return Markup("")
+        return Markup(str(value).replace("\n", "<br />"))
+
     env.filters.update(
         percent_to_color=percent_to_color,
         auto_convert_unit=auto_convert_unit,
         format_cpu_freq=format_cpu_freq,
-        br=lambda s: (str(s).replace("\n", "<br />") if s is not None else ""),
+        br=br_filter,
     )
 
     template = env.from_string(tmpl)

@@ -19,10 +19,10 @@ CACHE_DIR = Path(__file__).parent / ".cache"
 
 
 @register(
-    "picstatus",
-    "Codex",
-    "以图片形式显示当前设备的运行状态（AstrBot 版）",
-    "1.0.0",
+	PLUGIN_NAME,
+	"薄暝",
+	"以图片形式显示当前设备的运行状态",
+	"1.0.0",
 )
 class PicStatusPlugin(Star):
     def __init__(self, context: Context, config=None):
@@ -36,9 +36,10 @@ class PicStatusPlugin(Star):
     @filter.command("运行状态", alias=ALIASES)
     async def cmd_status(self, event: AstrMessageEvent):
         """生成并发送当前服务器运行状态图片"""
+        # t2i_error 用於標記 AstrBot t2i 渲染階段的錯誤，使外層錯誤處理可以給出更精準提示。
+        t2i_error: Exception | None = None
         try:
             collected = await collect_all()
-            collected.setdefault("nonebot_version", "AstrBot")
             collected.setdefault("ps_version", "v1.0.0")
             # Provide header bots info for template compatibility
             try:
@@ -61,7 +62,7 @@ class PicStatusPlugin(Star):
                         "self_id": self_id,
                         "nick": bot_nick,
                         "adapter": adapter,
-                        "bot_connected": collected.get("nonebot_run_time", ""),
+                        "bot_connected": collected.get("bot_run_time", ""),
                         "msg_rec": 0,
                         "msg_sent": 0,
                     }
@@ -95,7 +96,6 @@ class PicStatusPlugin(Star):
                 local_path=Path(local_path) if local_path else None,
             )
             # Only use AstrBot t2i path
-            t2i_error: Exception | None = None
             try:
                 from .t2i_renderer import build_default_html
                 import httpx

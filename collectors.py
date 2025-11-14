@@ -238,7 +238,7 @@ def process_status(n: int = 5) -> list[ProcStatus]:
 
 
 async def collect_all() -> dict[str, Any]:
-    # mimic schema expected by default template/macros
+    # 采集系统及运行状态信息，供前端模板使用
     return {
         "cpu_percent": cpu_percent(),
         "cpu_count": cpu_count(),
@@ -252,14 +252,12 @@ async def collect_all() -> dict[str, Any]:
         "network_io": network_io(),
         "network_connection": await connection_test(),
         "process_status": process_status(),
-        # footer
-        # d.nonebot_version will be filled in renderer as "AstrBot"
-        # d.ps_version will be from metadata
+        # footer 信息：时间、Python 版本、系统名称、插件版本等
         "time": _dt_now().strftime("%Y-%m-%d %H:%M:%S"),
         "python_version": sys_version(),
         "system_name": system_name_readable(),
-        # header
-        "nonebot_run_time": _format_td(_dt_now() - ASTRBOT_START_TIME),
+        # header：AstrBot / 机器人运行时长
+        "bot_run_time": _format_td(_dt_now() - ASTRBOT_START_TIME),
         "system_run_time": _format_td(_dt_now() - BOOT_TIME),
     }
 

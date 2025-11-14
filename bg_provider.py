@@ -10,7 +10,7 @@ try:
 except Exception:  # pragma: no cover - fallback for local test env
     import logging
 
-    logger = logging.getLogger("picstatus")
+    logger = logging.getLogger("astrbot_plugin_picstatus")
 
 
 ASSETS_PATH = Path(__file__).parent / "res" / "assets"
